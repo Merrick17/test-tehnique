@@ -1,0 +1,143 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+}
+
+enum LeadStatus {
+  DISTRIBUTED
+  NON_DISTRIBUTED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(ADMIN)
+  createdAt    DateTime @default(now())
+}
+
+model Vertical {
+  id   String @id @default(cuid())
+  name String
+  slug String @unique
+
+  deliveries Delivery[]
+  leads      Lead[]
+}
+
+model Client {
+  id       String  @id @default(cuid())
+  name     String
+  email    String?
+  isActive Boolean @default(true)
+
+  deliveries    Delivery[]
+  distributions Distribution[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Delivery {
+  id String @id @default(cuid())
+
+  clientId   String
+  verticalId String
+
+  minAge        Int
+  maxAge        Int
+  dailyCapacity Int
+  pricePerLead  Decimal @db.Decimal(10, 2)
+  isActive      Boolean @default(true)
+
+  client   Client   @relation(fields: [clientId], references: [id])
+  vertical Vertical @relation(fields: [verticalId], references: [id])
+
+  postalCodes   DeliveryPostalCode[]
+  timeWindows   DeliveryTimeWindow[]
+  distributions Distribution[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([clientId])
+  @@index([verticalId])
+  @@index([isActive])
+}
+
+model DeliveryPostalCode {
+  id String @id @default(cuid())
+
+  deliveryId String
+  postalCode String
+
+  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@unique([deliveryId, postalCode])
+  @@index([postalCode])
+}
+
+model DeliveryTimeWindow {
+  id String @id @default(cuid())
+
+  deliveryId String
+  startMinute Int
+  endMinute   Int
+
+  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@index([deliveryId])
+}
+
+model Lead {
+  id String @id @default(cuid())
+
+  firstName  String
+  lastName   String
+  birthDate  DateTime
+  postalCode String
+
+  verticalId String
+  vertical   Vertical @relation(fields: [verticalId], references: [id])
+
+  receivedAt DateTime   @default(now())
+  status     LeadStatus @default(NON_DISTRIBUTED)
+
+  distributions Distribution[]
+
+  createdAt DateTime @default(now())
+
+  @@index([verticalId])
+  @@index([postalCode])
+  @@index([status])
+  @@index([receivedAt])
+}
+
+model Distribution {
+  id String @id @default(cuid())
+
+  leadId     String
+  clientId   String
+  deliveryId String
+
+  pricePaid Decimal @db.Decimal(10, 2)
+
+  distributedAt DateTime @default(now())
+
+  lead     Lead     @relation(fields: [leadId], references: [id])
+  client   Client   @relation(fields: [clientId], references: [id])
+  delivery Delivery @relation(fields: [deliveryId], references: [id])
+
+  @@index([leadId])
+  @@index([clientId])
+  @@index([deliveryId])
+  @@index([distributedAt])
+}
